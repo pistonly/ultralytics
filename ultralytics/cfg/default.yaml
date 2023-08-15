@@ -115,9 +115,6 @@ cfg:  # (str, optional) for overriding defaults.yaml
 tracker: botsort.yaml  # (str) tracker type, choices=[botsort.yaml, bytetrack.yaml]
 
 # for paddlepaddle
-is_pp: False
 infer_config: None
 
-# for damo-yolo
-is_damo: False
 

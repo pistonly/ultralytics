@@ -15,7 +15,6 @@ from tqdm import tqdm
 from ultralytics.utils import LOCAL_RANK, NUM_THREADS, TQDM_BAR_FORMAT, is_dir_writeable
 
 from .augment import Compose, Format, Instances, LetterBox, classify_albumentations, classify_transforms, v8_transforms
-from .augment import PixNormalize, LetterBox_new, ToTensorOnly
 from .pp_transforms import PP_Compose, PPFormat
 from .damo_transforms import DAMO_Compose, DAMO_Padding_UL
 from .damo_transforms import DAMO_Resize, DAMO_RandomHorizontalFlip, DAMO_ToTensor, DAMO_Normalize, DAMOFormat

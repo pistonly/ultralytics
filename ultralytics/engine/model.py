@@ -283,7 +283,7 @@ class Model:
         overrides['rect'] = True  # rect batches as default
         overrides.update(kwargs)
         overrides['mode'] = 'val'
-        if overrides.get('imgsz') is None:
+        if not isinstance(self.model, str) and overrides.get('imgsz') is None:
             overrides['imgsz'] = self.model.args['imgsz']  # use trained imgsz unless custom value is passed
         args = get_cfg(cfg=DEFAULT_CFG, overrides=overrides)
         args.data = data or args.data

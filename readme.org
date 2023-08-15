@@ -1,3 +1,4 @@
 * default settings
 - datasets_dir: for relative dataset path
+  utils.__init__.py/get_user_config_dir() setting datasets_dir: ~/.config/Ultralytics-compare/settings.yaml
   
