@@ -3,6 +3,8 @@
 from itertools import repeat
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
+from copy import deepcopy
+import yaml
 
 import cv2
 import numpy as np
@@ -13,8 +15,13 @@ from tqdm import tqdm
 from ultralytics.utils import LOCAL_RANK, NUM_THREADS, TQDM_BAR_FORMAT, is_dir_writeable
 
 from .augment import Compose, Format, Instances, LetterBox, classify_albumentations, classify_transforms, v8_transforms
+from .augment import PixNormalize, LetterBox_new, ToTensorOnly
+from .pp_transforms import PP_Compose, PPFormat
+from .damo_transforms import DAMO_Compose, DAMO_Padding_UL
+from .damo_transforms import DAMO_Resize, DAMO_RandomHorizontalFlip, DAMO_ToTensor, DAMO_Normalize, DAMOFormat
 from .base import BaseDataset
 from .utils import HELP_URL, LOGGER, get_hash, img2label_paths, verify_image_label
+import pdb
 
 
 class YOLODataset(BaseDataset):
@@ -30,7 +37,6 @@ class YOLODataset(BaseDataset):
         (torch.utils.data.Dataset): A PyTorch dataset object that can be used for training an object detection model.
     """
     cache_version = '1.0.2'  # dataset labels *.cache version, >= 1.0.0 for YOLOv8
-    rand_interp_methods = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4]
 
     def __init__(self, *args, data=None, use_segments=False, use_keypoints=False, **kwargs):
         self.use_segments = use_segments
@@ -192,7 +198,11 @@ class YOLODataset(BaseDataset):
             if k == 'img':
                 value = torch.stack(value, 0)
             if k in ['masks', 'keypoints', 'bboxes', 'cls']:
-                value = torch.cat(value, 0)
+                try:
+                    value = torch.cat(value, 0)
+                except:
+                    print(k)
+                    pdb.set_trace()
             new_batch[k] = value
         new_batch['batch_idx'] = list(new_batch['batch_idx'])
         for i in range(len(new_batch['batch_idx'])):
@@ -274,3 +284,74 @@ class SemanticDataset(BaseDataset):
     def __init__(self):
         """Initialize a SemanticDataset object."""
         super().__init__()
+
+
+class PPDataset(YOLODataset):
+
+    def build_transforms(self, hyp=None):  # paddle inference parameters
+        if self.augment:
+            raise ValueError(f"ppdataset not support argument currently!")
+        else:
+            infer_config = hyp.infer_config  # paddle inference parameters
+            with open(infer_config) as f:
+                yml_conf = yaml.safe_load(f)
+            transforms = PP_Compose(yml_conf['Preprocess'])
+            transforms.append(
+                PPFormat(bbox_format='xywh',
+                         normalize=True,
+                         return_mask=self.use_segments,
+                         return_keypoint=self.use_keypoints,
+                         batch_idx=True,
+                         mask_ratio=hyp.mask_ratio,
+                         mask_overlap=hyp.overlap_mask))
+            return transforms
+
+    def __getitem__(self, index):
+        """Get a sample and its corresponding label, filename and shape from the dataset."""
+        # index = self.indices[index]  # linear, shuffled, or image_weights
+        file_path = self.im_files[index]
+        labels = deepcopy(self.labels[index])
+        labels.pop('shape', None)  # shape is for rect, remove it. get ori_shape in PPFormat
+        labels = self.update_labels_info(self.labels[index].copy())
+        labels = self.transforms(file_path, labels)
+        return labels
+
+
+class DAMODataset(YOLODataset):
+
+    def build_transforms(self, hyp=None):
+        if self.augment:
+            raise ValueError(f"damo_dataset not support argument currently!")
+        else:
+            damo_val_transform = {
+                'image_mean': [0.0, 0.0, 0.0],
+                'image_std': [1.0, 1.0, 1.0],
+                'image_max_range': (640, 640),
+                'flip_prob': 0.0, }
+            transforms = [
+                DAMO_Resize(damo_val_transform['image_max_range']),
+                DAMO_RandomHorizontalFlip(damo_val_transform['flip_prob']),
+                DAMO_ToTensor(),
+                DAMO_Normalize(mean=damo_val_transform['image_mean'], std=damo_val_transform['image_std']),
+                DAMO_Padding_UL(damo_val_transform['image_max_range'])]
+            transforms = DAMO_Compose(transforms)
+            transforms.append(
+                DAMOFormat(bbox_format='xywh',
+                           normalize=True,
+                           return_mask=self.use_segments,
+                           return_keypoint=self.use_keypoints,
+                           batch_idx=True,
+                           mask_ratio=hyp.mask_ratio,
+                           mask_overlap=hyp.overlap_mask))
+
+            return transforms
+
+    def __getitem__(self, index):
+        """Get a sample and its corresponding label, filename and shape from the dataset."""
+        # index = self.indices[index]  # linear, shuffled, or image_weights
+        file_path = self.im_files[index]
+        labels = deepcopy(self.labels[index])
+        labels.pop('shape', None)  # shape is for rect, remove it. get ori_shape in PPFormat
+        labels = self.update_labels_info(self.labels[index].copy())
+        labels = self.transforms(file_path, labels)
+        return labels

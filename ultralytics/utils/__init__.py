@@ -22,11 +22,11 @@ import torch
 import yaml
 
 from ultralytics import __version__
+import pdb
 
 # PyTorch Multi-GPU DDP Constants
 RANK = int(os.getenv('RANK', -1))
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
-WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
 
 # Other Constants
 FILE = Path(__file__).resolve()
@@ -576,7 +576,7 @@ def get_ubuntu_version():
     return None
 
 
-def get_user_config_dir(sub_dir='Ultralytics'):
+def get_user_config_dir(sub_dir='Ultralytics-compare'):
     """
     Get the user config directory.
 

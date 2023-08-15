@@ -19,6 +19,7 @@ from ultralytics.utils import ARM64, LINUX, LOGGER, ROOT, yaml_load
 from ultralytics.utils.checks import check_requirements, check_suffix, check_version, check_yaml
 from ultralytics.utils.downloads import attempt_download_asset, is_url
 from ultralytics.utils.ops import xywh2xyxy
+import pdb
 
 
 def check_class_names(names):
@@ -80,7 +81,7 @@ class AutoBackend(nn.Module):
         super().__init__()
         w = str(weights[0] if isinstance(weights, list) else weights)
         nn_module = isinstance(weights, torch.nn.Module)
-        pt, jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs, paddle, ncnn, triton = \
+        pt, jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs, paddle, ncnn, bmodel, triton = \
             self._model_type(w)
         fp16 &= pt or jit or onnx or xml or engine or nn_module or triton  # FP16
         nhwc = coreml or saved_model or pb or tflite or edgetpu  # BHWC formats (vs torch BCWH)
@@ -89,7 +90,7 @@ class AutoBackend(nn.Module):
 
         # Set device
         cuda = torch.cuda.is_available() and device.type != 'cpu'  # use CUDA
-        if cuda and not any([nn_module, pt, jit, engine]):  # GPU dataloader formats
+        if cuda and not any([nn_module, pt, jit, engine, onnx]):  # GPU dataloader formats
             device = torch.device('cpu')
             cuda = False
 
@@ -138,7 +139,11 @@ class AutoBackend(nn.Module):
             providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
             session = onnxruntime.InferenceSession(w, providers=providers)
             output_names = [x.name for x in session.get_outputs()]
+            input_names = [x.name for x in session.get_inputs()]
             metadata = session.get_modelmeta().custom_metadata_map  # metadata
+            # for multiple inputs
+            binding_im_name = [_name for _name in input_names if "image" in _name][0]
+
         elif xml:  # OpenVINO
             LOGGER.info(f'Loading {w} for OpenVINO inference...')
             check_requirements('openvino>=2023.0')  # requires openvino-dev: https://pypi.org/project/openvino-dev/
@@ -178,8 +183,12 @@ class AutoBackend(nn.Module):
             output_names = []
             fp16 = False  # default updated below
             dynamic = False
+            binding_im_name = 'images'
             for i in range(model.num_bindings):
                 name = model.get_binding_name(i)
+                if 'image' in name:
+                    binding_im_name = name
+                # name = "images" if name == "image" else name
                 dtype = trt.nptype(model.get_binding_dtype(i))
                 if model.binding_is_input(i):
                     if -1 in tuple(model.get_binding_shape(i)):  # dynamic
@@ -187,13 +196,20 @@ class AutoBackend(nn.Module):
                         context.set_binding_shape(i, tuple(model.get_profile_shape(0, i)[2]))
                     if dtype == np.float16:
                         fp16 = True
+                    input_names.append(name)
                 else:  # output
                     output_names.append(name)
                 shape = tuple(context.get_binding_shape(i))
                 im = torch.from_numpy(np.empty(shape, dtype=dtype)).to(device)
                 bindings[name] = Binding(name, dtype, shape, im, int(im.data_ptr()))
             binding_addrs = OrderedDict((n, d.ptr) for n, d in bindings.items())
-            batch_size = bindings['images'].shape[0]  # if dynamic, this is instead max batch size
+            # if dynamic, this is instead max batch size
+            batch_size = bindings[binding_im_name].shape[0]
+            # TODO:
+            if 'concat' in output_names[0]:
+                output_names_tmp = output_names.copy()
+                output_names[0] = output_names_tmp[1]
+                output_names[1] = output_names_tmp[0]
         elif coreml:  # CoreML
             LOGGER.info(f'Loading {w} for CoreML inference...')
             import coremltools as ct
@@ -281,6 +297,18 @@ class AutoBackend(nn.Module):
             nhwc = model.runtime.startswith("tensorflow")
             """
             raise NotImplementedError('Triton Inference Server is not currently supported.')
+        elif bmodel:
+            LOGGER.info("loading bmodel")
+            cuda = False
+            try:
+                from ultralytics.sophon_utils import SophonInference
+            except ImportError as e:
+                LOGGER.debug("can't find sail package!")
+                raise ImportError(e.args)
+            net = SophonInference(model_path=w, device_id=0,
+                                  input_model=0, # use opencv
+                                  )
+            batch_size, net_c, net_h, net_w = net.inputs_shapes[0]
         else:
             from ultralytics.engine.exporter import export_formats
             raise TypeError(f"model='{w}' is not a supported model format. "
@@ -296,11 +324,11 @@ class AutoBackend(nn.Module):
                     metadata[k] = int(v)
                 elif k in ('imgsz', 'names', 'kpt_shape') and isinstance(v, str):
                     metadata[k] = eval(v)
-            stride = metadata['stride']
-            task = metadata['task']
-            batch = metadata['batch']
-            imgsz = metadata['imgsz']
-            names = metadata['names']
+            stride = metadata.get('stride')
+            task = metadata.get('task')
+            batch = metadata.get('batch')
+            imgsz = metadata.get('imgsz')
+            names = metadata.get('names')
             kpt_shape = metadata.get('kpt_shape')
         elif not (pt or triton or nn_module):
             LOGGER.warning(f"WARNING ⚠️ Metadata not found for 'model={weights}'")
@@ -312,7 +340,7 @@ class AutoBackend(nn.Module):
 
         self.__dict__.update(locals())  # assign all variables to self
 
-    def forward(self, im, augment=False, visualize=False):
+    def forward(self, batch, augment=False, visualize=False):
         """
         Runs inference on the YOLOv8 MultiBackend model.
 
@@ -324,6 +352,7 @@ class AutoBackend(nn.Module):
         Returns:
             (tuple): Tuple containing the raw output tensor, and processed output for visualization (if visualize=True)
         """
+        im = batch['img']
         b, ch, h, w = im.shape  # batch, channel, height, width
         if self.fp16 and im.dtype != torch.float16:
             im = im.half()  # to FP16
@@ -340,23 +369,43 @@ class AutoBackend(nn.Module):
             y = self.net.forward()
         elif self.onnx:  # ONNX Runtime
             im = im.cpu().numpy()  # torch to numpy
-            y = self.session.run(self.output_names, {self.session.get_inputs()[0].name: im})
+            inputs = {}
+            for k in self.input_names:
+                if k not in batch and k in ['image', 'images', self.binding_im_name]:
+                    inputs[k] = batch['img'].cpu().numpy()
+                else:
+                    inputs[k] = batch[k].cpu().numpy() if isinstance(batch[k], torch.Tensor) else batch[k]
+            # [bbox, cls]
+            y = self.session.run(self.output_names, inputs)
         elif self.xml:  # OpenVINO
             im = im.cpu().numpy()  # FP32
             y = list(self.ov_compiled_model(im).values())
         elif self.engine:  # TensorRT
-            if self.dynamic and im.shape != self.bindings['images'].shape:
-                i = self.model.get_binding_index('images')
+            binding_im_name = self.binding_im_name
+            if self.dynamic and im.shape != self.bindings[binding_im_name].shape:
+                i = self.model.get_binding_index(binding_im_name)
                 self.context.set_binding_shape(i, im.shape)  # reshape if dynamic
-                self.bindings['images'] = self.bindings['images']._replace(shape=im.shape)
+                self.bindings[binding_im_name] = self.bindings[binding_im_name]._replace(shape=im.shape)
                 for name in self.output_names:
                     i = self.model.get_binding_index(name)
                     self.bindings[name].data.resize_(tuple(self.context.get_binding_shape(i)))
-            s = self.bindings['images'].shape
+            s = self.bindings[binding_im_name].shape
             assert im.shape == s, f"input size {im.shape} {'>' if self.dynamic else 'not equal to'} max model size {s}"
-            self.binding_addrs['images'] = int(im.data_ptr())
+            for k in self.input_names:
+                if k not in batch and k in ['image', 'images', self.binding_im_name]:
+                    self.binding_addrs[k] = int(im.data_ptr())
+                else:
+                    self.binding_addrs[k] = int(batch[k].data_ptr())
             self.context.execute_v2(list(self.binding_addrs.values()))
-            y = [self.bindings[x].data for x in sorted(self.output_names)]
+            # [bbox, cls]
+            y = [self.bindings[x].data for x in self.output_names]
+        elif self.bmodel:
+            # t0 = time.time()
+            im = im.cpu().numpy()
+            # t1 = time.time()
+            y = self.net.infer_numpy([im])
+            # t2 = time.time()
+            # print(f"bmodel infer cost_global: {t1 - t0}, {t2 - t1}")
         elif self.coreml:  # CoreML
             im = im[0].cpu().numpy()
             im_pil = Image.fromarray((im * 255).astype('uint8'))
@@ -461,8 +510,13 @@ class AutoBackend(nn.Module):
         warmup_types = self.pt, self.jit, self.onnx, self.engine, self.saved_model, self.pb, self.triton, self.nn_module
         if any(warmup_types) and (self.device.type != 'cpu' or self.triton):
             im = torch.empty(*imgsz, dtype=torch.half if self.fp16 else torch.float, device=self.device)  # input
+            # for ppyolo
+            scale_factor = torch.empty((imgsz[0], 2), dtype=torch.half if self.fp16 else torch.float, device=self.device)
+            # for ppyolo
+            im_shape = torch.empty((imgsz[0], 2), dtype=torch.half if self.fp16 else torch.float, device=self.device)
+            batch_data = {'img': im, "scale_factor": scale_factor, "im_shape": im_shape}
             for _ in range(2 if self.jit else 1):  #
-                self.forward(im)  # warmup
+                self.forward(batch_data)  # warmup
 
     @staticmethod
     def _apply_default_class_names(data):

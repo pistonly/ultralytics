@@ -9,11 +9,12 @@ from ultralytics.cfg import get_cfg
 from ultralytics.engine.exporter import Exporter
 from ultralytics.hub.utils import HUB_WEB_ROOT
 from ultralytics.nn.tasks import attempt_load_one_weight, guess_model_task, nn, yaml_model_load
-from ultralytics.utils import (DEFAULT_CFG, DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, RANK, ROOT, callbacks,
+from ultralytics.utils import (DEFAULT_CFG, DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, RANK, ROOT, callbacks, emojis,
                                is_git_dir, yaml_load)
 from ultralytics.utils.checks import check_file, check_imgsz, check_pip_update_available, check_yaml
 from ultralytics.utils.downloads import GITHUB_ASSET_STEMS
 from ultralytics.utils.torch_utils import smart_inference_mode
+import pdb
 
 
 class Model:
@@ -282,6 +283,8 @@ class Model:
         overrides['rect'] = True  # rect batches as default
         overrides.update(kwargs)
         overrides['mode'] = 'val'
+        if overrides.get('imgsz') is None:
+            overrides['imgsz'] = self.model.args['imgsz']  # use trained imgsz unless custom value is passed
         args = get_cfg(cfg=DEFAULT_CFG, overrides=overrides)
         args.data = data or args.data
         if 'task' in overrides:
@@ -289,9 +292,13 @@ class Model:
         else:
             args.task = self.task
         validator = validator or self.smart_load('validator')
-        if args.imgsz == DEFAULT_CFG.imgsz and not isinstance(self.model, (str, Path)):
-            args.imgsz = self.model.args['imgsz']  # use trained imgsz unless custom value is passed
         args.imgsz = check_imgsz(args.imgsz, max_dim=1)
+
+        if isinstance(self.model, str):
+            if Path(self.model).name.startswith("paddle") and (self.model.endswith(".onnx") or self.model.endswith(".engine")):
+                config_name = "_".join(Path(self.model).stem.split("_")[:3]) + ".yml"
+                if not args.infer_config:
+                    args.infer_config = str(Path(self.model).parent / "paddle_infer_config" / config_name)
 
         validator = validator(args=args, _callbacks=self.callbacks)
         validator(model=self.model)
@@ -448,11 +455,11 @@ class Model:
         """Load model/trainer/validator/predictor."""
         try:
             return self.task_map[self.task][key]
-        except Exception:
+        except Exception as e:
             name = self.__class__.__name__
             mode = inspect.stack()[1][3]  # get the function name.
             raise NotImplementedError(
-                f'WARNING ⚠️ `{name}` model does not support `{mode}` mode for `{self.task}` task yet.')
+                emojis(f'WARNING ⚠️ `{name}` model does not support `{mode}` mode for `{self.task}` task yet.')) from e
 
     @property
     def task_map(self):

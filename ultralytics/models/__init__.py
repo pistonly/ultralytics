@@ -3,5 +3,7 @@
 from .rtdetr import RTDETR
 from .sam import SAM
 from .yolo import YOLO
+from .ppyolo import PPYOLO
+from .damoyolo import DAMOYOLO
 
-__all__ = 'YOLO', 'RTDETR', 'SAM'  # allow simpler import
+__all__ = 'YOLO', 'RTDETR', 'SAM', "PPYOLO", "DAMOYOLO"  # allow simpler import

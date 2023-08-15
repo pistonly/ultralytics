@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 import torch
 import torchvision.transforms as T
+from torchvision.transforms import functional as F
 
 from ultralytics.utils import LOGGER, colorstr
 from ultralytics.utils.checks import check_version
@@ -16,8 +17,7 @@ from ultralytics.utils.metrics import bbox_ioa
 from ultralytics.utils.ops import segment2box
 
 from .utils import polygons2masks, polygons2masks_overlap
-
-POSE_FLIPLR_INDEX = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
+import pdb
 
 
 # TODO: we might need a BaseTransform to make all these augments be compatible with both classification and semantic
@@ -588,6 +588,7 @@ class LetterBox:
                                  value=(114, 114, 114))  # add border
 
         if len(labels):
+            # NOTE:update labels first then reassign img
             labels = self._update_labels(labels, ratio, dw, dh)
             labels['img'] = img
             labels['resized_shape'] = new_shape
@@ -602,6 +603,7 @@ class LetterBox:
         labels['instances'].scale(*ratio)
         labels['instances'].add_padding(padw, padh)
         return labels
+
 
 
 class CopyPaste:
@@ -693,7 +695,7 @@ class Albumentations:
 
 
 # TODO: technically this is not an augmentation, maybe we should put this to another files
-class Format:
+class Format(object):
 
     def __init__(self,
                  bbox_format='xywh',

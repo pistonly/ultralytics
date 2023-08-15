@@ -18,6 +18,7 @@ from tqdm import tqdm
 from ultralytics.utils import DEFAULT_CFG, LOCAL_RANK, LOGGER, NUM_THREADS, TQDM_BAR_FORMAT
 
 from .utils import HELP_URL, IMG_FORMATS
+import pdb
 
 
 class BaseDataset(Dataset):
@@ -238,6 +239,11 @@ class BaseDataset(Dataset):
     def __getitem__(self, index):
         """Returns transformed label information for given index."""
         return self.transforms(self.get_image_and_label(index))
+        # labels = self.get_image_and_label(index)
+        # pdb.set_trace()
+        # labels = self.transforms(labels)
+        # return labels
+        
 
     def get_image_and_label(self, index):
         """Get and return label information from the dataset."""

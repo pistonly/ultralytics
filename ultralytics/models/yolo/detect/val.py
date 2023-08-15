@@ -6,13 +6,14 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from ultralytics.data import build_dataloader, build_yolo_dataset
+from ultralytics.data import build_dataloader, build_yolo_dataset, build_pp_dataset
 from ultralytics.engine.validator import BaseValidator
 from ultralytics.utils import DEFAULT_CFG, LOGGER, ops
 from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.metrics import ConfusionMatrix, DetMetrics, box_iou
 from ultralytics.utils.plotting import output_to_target, plot_images
 from ultralytics.utils.torch_utils import de_parallel
+import pdb
 
 
 class DetectionValidator(BaseValidator):
@@ -20,9 +21,10 @@ class DetectionValidator(BaseValidator):
     def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
         """Initialize detection model with necessary variables and settings."""
         super().__init__(dataloader, save_dir, pbar, args, _callbacks)
-        self.args.task = 'detect'
+        self.nt_per_class = None
         self.is_coco = False
         self.class_map = None
+        self.args.task = 'detect'
         self.metrics = DetMetrics(save_dir=self.save_dir, on_plot=self.on_plot)
         self.iouv = torch.linspace(0.5, 0.95, 10)  # iou vector for mAP@0.5:0.95
         self.niou = self.iouv.numel()
@@ -65,14 +67,28 @@ class DetectionValidator(BaseValidator):
         return ('%22s' + '%11s' * 6) % ('Class', 'Images', 'Instances', 'Box(P', 'R', 'mAP50', 'mAP50-95)')
 
     def postprocess(self, preds):
-        """Apply Non-maximum suppression to prediction outputs."""
-        return ops.non_max_suppression(preds,
-                                       self.args.conf,
-                                       self.args.iou,
-                                       labels=self.lb,
-                                       multi_label=True,
-                                       agnostic=self.args.single_cls,
-                                       max_det=self.args.max_det)
+        """Apply Non-maximum suppression to prediction outputs.
+        return:
+        (List[torch.Tensor]): tensor shape (num_boxes, 6 + num_masks) (x1, y1, x2, y2, conf, cls, mask1, mask2, ...)
+        """
+
+        # onnx end2end
+        if self.model.onnx and len(self.model.output_names) > 1:
+            # ['num_dets', 'det_boxes', 'det_scores', 'det_classes']
+            num_dets, det_boxes, det_scores, det_classes = preds
+            batch = num_dets.shape[0]
+            preds = []
+            for i in range(batch):
+                preds.append(torch.concat((det_boxes[i], torch.reshape(det_scores, (-1, 1)), torch.reshape(det_classes, (-1, 1))), 1))
+        else:
+            preds = ops.non_max_suppression(preds,
+                                            self.args.conf,
+                                            self.args.iou,
+                                            labels=self.lb,
+                                            multi_label=True,
+                                            agnostic=self.args.single_cls,
+                                            max_det=self.args.max_det)
+        return preds
 
     def update_metrics(self, preds, batch):
         """Metrics."""
@@ -82,6 +98,7 @@ class DetectionValidator(BaseValidator):
             bbox = batch['bboxes'][idx]
             nl, npr = cls.shape[0], pred.shape[0]  # number of labels, predictions
             shape = batch['ori_shape'][si]
+            pdb.set_trace()
             correct_bboxes = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
             self.seen += 1
 
@@ -155,18 +172,23 @@ class DetectionValidator(BaseValidator):
 
     def _process_batch(self, detections, labels):
         """
-        Return correct prediction matrix
-        Arguments:
-            detections (array[N, 6]), x1, y1, x2, y2, conf, class
-            labels (array[M, 5]), class, x1, y1, x2, y2
+        Return correct prediction matrix.
+
+        Args:
+            detections (torch.Tensor): Tensor of shape [N, 6] representing detections.
+                Each detection is of the format: x1, y1, x2, y2, conf, class.
+            labels (torch.Tensor): Tensor of shape [M, 5] representing labels.
+                Each label is of the format: class, x1, y1, x2, y2.
+
         Returns:
-            correct (array[N, 10]), for 10 IoU levels
+            (torch.Tensor): Correct prediction matrix of shape [N, 10] for 10 IoU levels.
         """
         iou = box_iou(labels[:, 1:], detections[:, :4])
         return self.match_predictions(detections[:, 5], labels[:, 0], iou)
 
     def build_dataset(self, img_path, mode='val', batch=None):
-        """Build YOLO Dataset
+        """
+        Build YOLO Dataset.
 
         Args:
             img_path (str): Path to the folder containing images.
@@ -174,6 +196,11 @@ class DetectionValidator(BaseValidator):
             batch (int, optional): Size of batches, this is for `rect`. Defaults to None.
         """
         gs = max(int(de_parallel(self.model).stride if self.model else 0), 32)
+        # if self.args.is_pp:
+        #     return build_pp_dataset(self.args, img_path, batch, self.data, mode=mode, stride=gs)
+        # elif self.args.is_damo:
+        #     raise RuntimeError("damo yolo is not supported!")
+        # else:
         return build_yolo_dataset(self.args, img_path, batch, self.data, mode=mode, stride=gs)
 
     def get_dataloader(self, dataset_path, batch_size):
