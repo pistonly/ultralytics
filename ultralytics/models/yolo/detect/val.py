@@ -98,7 +98,6 @@ class DetectionValidator(BaseValidator):
             bbox = batch['bboxes'][idx]
             nl, npr = cls.shape[0], pred.shape[0]  # number of labels, predictions
             shape = batch['ori_shape'][si]
-            pdb.set_trace()
             correct_bboxes = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
             self.seen += 1
 
