@@ -35,6 +35,7 @@ from ultralytics.utils.checks import check_imgsz
 from ultralytics.utils.files import increment_path
 from ultralytics.utils.ops import Profile
 from ultralytics.utils.torch_utils import de_parallel, select_device, smart_inference_mode
+import pandas as pd 
 
 
 class BaseValidator:
@@ -207,6 +208,7 @@ class BaseValidator:
         if self.training:
             model.float()
             results = {**stats, **trainer.label_loss_items(self.loss.cpu() / len(self.dataloader), prefix='val')}
+            self.save_results()
             return {k: round(float(v), 5) for k, v in results.items()}  # return results as 5 decimal place floats
         else:
             LOGGER.info('Speed: %.1fms preprocess, %.1fms inference, %.1fms loss, %.1fms postprocess per image' %
@@ -218,6 +220,7 @@ class BaseValidator:
                 stats = self.eval_json(stats)  # update stats
             if self.args.plots or self.args.save_json:
                 LOGGER.info(f"Results saved to {colorstr('bold', self.save_dir)}")
+            self.save_results()
             return stats
 
     def match_predictions(self, pred_classes, true_classes, iou):
@@ -295,6 +298,34 @@ class BaseValidator:
     def print_results(self):
         """Prints the results of the model's predictions."""
         pass
+
+    def save_results(self):
+        # args
+        pd.Series(dict(self.args)).to_json(str(self.save_dir / "args.json"), indent=4)
+
+        # per class
+        LOGGER.info("saving results")
+        stats_per_class = []
+        for i, c in enumerate(self.metrics.ap_class_index):
+            stats_i = {"names": self.names[c],
+                       "seen": self.seen,
+                       'nt': self.nt_per_class[c],
+                       }
+            stats_i.update(dict(zip(self.metrics.keys, self.metrics.class_result(i))))
+            stats_per_class.append(stats_i)
+        # save
+        pd.DataFrame(stats_per_class).to_json(str(self.save_dir / 'stats_per_class.json'), orient='index', indent=4)
+        # mean
+        stats_mean = {'names': "all",
+                      'seen': self.seen,
+                      'nt': self.nt_per_class.sum(),
+                      }
+        stats_mean.update(dict(zip(self.metrics.keys, self.metrics.mean_results())))
+        pd.Series(stats_mean).to_json(str(self.save_dir / 'stats_mean.json'), indent=4)
+
+        # speed
+        pd.Series(self.speed).to_json(str(self.save_dir / "speed.json"), indent=4)
+
 
     def get_desc(self):
         """Get description of the YOLO model."""

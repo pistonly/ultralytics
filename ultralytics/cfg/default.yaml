@@ -117,4 +117,6 @@ tracker: botsort.yaml  # (str) tracker type, choices=[botsort.yaml, bytetrack.ya
 # for paddlepaddle
 infer_config: None
 
+#
+replace: False
 

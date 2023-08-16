@@ -635,6 +635,14 @@ class Metric(SimpleClass):
         """
         self.p, self.r, self.f1, self.all_ap, self.ap_class_index = results
 
+    def update_from_coco(self, coco_eval):
+        '''
+        coco_eval: cocoeval.accumulate()'s result, which has keys: [params, date, counts, precision, recall]
+        coco_eval['precision']: 10x101x80x4x3
+        '''
+        all_ap = coco_eval['precision'][:, :, :, 0, -1].mean(axis=1)
+        self.all_ap = all_ap.T
+
 
 class DetMetrics(SimpleClass):
     """

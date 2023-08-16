@@ -271,6 +271,9 @@ class DetectionValidator(BaseValidator):
                 eval.accumulate()
                 eval.summarize()
                 stats[self.metrics.keys[-1]], stats[self.metrics.keys[-2]] = eval.stats[:2]  # update mAP50-95 and mAP50
+
+                # update map
+                self.metrics.box.update_from_coco(eval.eval)
             except Exception as e:
                 LOGGER.warning(f'pycocotools unable to run: {e}')
         return stats
