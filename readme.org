@@ -2,7 +2,24 @@
 - datasets_dir: for relative dataset path
   utils.__init__.py/get_user_config_dir() setting datasets_dir: ~/.config/Ultralytics-compare/settings.yaml
   
-* TODO yolov6, damo-yolo postprocess slowly
+* DONE yolov6, damo-yolo, pp-yolo postprocess slowly
+CLOSED: [2023-08-16 三 18:30]
 :LOGBOOK:
+- State "DONE"       from "TODO"       [2023-08-16 三 18:30]
 - State "TODO"       from              [2023-08-16 三 12:07]
 :END:
+
+when conf=0.001, it can't filter out bboxes in predictions in yolov6, pp-yolo, damo-yolo
+
+if set conf=0.25 it will be fast. Because yolov8 has more sharp confidence distribution. see branch statics-prediction.
+
+* TODO docker support tensorRT>8.4 and onnxruntime-gpu 
+:LOGBOOK:
+- State "TODO"       from              [2023-08-16 三 18:57]
+:END:
+
+* TODO support eval, support ppyoloe-objects365
+:LOGBOOK:
+- State "TODO"       from              [2023-08-16 三 18:58]
+:END:
+
