@@ -51,11 +51,17 @@ class PPYOLOValidator(DetectionValidator):
         Apply Non-maximum suppression to prediction outputs.
         output (x1, y1, x2, y2, conf, class)
         """
-        if len(preds[0].shape) == 2:  # model with nms
-            # TODO: CHANGE OUTPUT ODER
-            return [preds[0]]
+        if len(preds[0].shape) == 2:  # model with nms. for detr
+            # TODO: check for batch > 1
+            pred = preds[0]
+            pred = torch.cat([pred[:, -4:], pred[:, 1:2] , pred[:, 0:1]], dim=1)
+            preds = torch.unsqueeze(pred, 0)
+            return preds
         elif len(preds[0].shape) == 1:
-            return [preds[1]]
+            pred = preds[1]
+            pred = torch.cat([pred[:, -4:], pred[:, 1:2] , pred[:, 0:1]], dim=1)
+            preds = torch.unsqueeze(pred, 0)
+            return preds
         else:
             box_pred = preds[0].permute([0, 2, 1])  # to [batch, bbox:4, nd]
             preds = torch.cat([box_pred, preds[1]], axis=1)

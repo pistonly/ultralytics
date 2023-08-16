@@ -23,3 +23,9 @@ if set conf=0.25 it will be fast. Because yolov8 has more sharp confidence distr
 - State "TODO"       from              [2023-08-16 三 18:58]
 :END:
 
+* DONE rtdetr onnx model error: ('im_shape',)
+CLOSED: [2023-08-17 四 02:33]
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2023-08-17 四 02:33]
+- State "TODO"       from              [2023-08-16 三 22:25]
+:END:

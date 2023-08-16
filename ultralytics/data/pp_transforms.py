@@ -265,7 +265,7 @@ class PPFormat(Format):
     def __call__(self, im, labels):
         labels['img'] = im
         labels['ori_shape'] = labels.pop('im_shape_ori', None)
-        labels['resized_shape'] = labels.pop('im_shape', None)
+        labels['resized_shape'] = labels.get('im_shape')  # for rtdetr, which need 'im_shape'
         labels = super().__call__(labels)
         return im, labels
 
