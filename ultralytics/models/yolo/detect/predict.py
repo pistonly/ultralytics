@@ -5,6 +5,7 @@ import torch
 from ultralytics.engine.predictor import BasePredictor
 from ultralytics.engine.results import Results
 from ultralytics.utils import DEFAULT_CFG, ROOT, ops
+import pdb
 
 
 class DetectionPredictor(BasePredictor):

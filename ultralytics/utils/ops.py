@@ -147,9 +147,9 @@ def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None, padding=True):
       boxes (torch.Tensor): The scaled bounding boxes, in the format of (x1, y1, x2, y2)
     """
     if ratio_pad is None:  # calculate from img0_shape
-        # gain = [min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])]  # gain  = old / new
-        gain = [img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1]]  # old / new, # diff with old-version
-        pad = round((img1_shape[1] - img0_shape[1] * gain) / 2 - 0.1), round((img1_shape[0] - img0_shape[0] * gain) / 2 - 0.1)  # wh padding
+        return scale_boxes_old(img1_shape, boxes, img0_shape, ratio_pad=None, padding=padding)
+        # gain = [img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1]]  # old / new, # diff with old-version
+        # pad = round((img1_shape[1] - img0_shape[1] * gain[1]) / 2 - 0.1), round((img1_shape[0] - img0_shape[0] * gain[0]) / 2 - 0.1)  # wh padding
     else:
         gain = ratio_pad[0]
         pad = ratio_pad[1]
@@ -160,7 +160,7 @@ def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None, padding=True):
 
     boxes[:, [0, 2]] /= gain[1]  # x gain
     boxes[:, [1, 3]] /= gain[0]  # y gain
-    boxes = clip_boxes(boxes, img0_shape)
+    clip_boxes(boxes, img0_shape)
     return boxes
 
 def make_divisible(x, divisor):

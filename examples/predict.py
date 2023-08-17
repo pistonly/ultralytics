@@ -48,10 +48,10 @@ name = Path(flags.w).stem
 
 exists_ok = True  # not increase save_dir. If want new results, set it to: False.
 
-args = {'conf': 0.25, 'iou':0.65, 'name':name, "plots": True, 'project': "runs", 'device': "0",
-        'exist_ok': exists_ok, 'replace': flags.replace}
+args = {'conf': 0.25, 'iou':0.65, 'name':f"predict-{name}", "plots": True, 'project': "runs", 'device': "0",
+        'exist_ok': exists_ok, 'replace': flags.replace, 'save': True}
 
-metrics = model.val(data="../ultralytics/cfg/datasets/coco.yaml", **args)
+metrics = model(source="../ultralytics/assets", **args)
 if metrics is None:
     print("skiped")
 

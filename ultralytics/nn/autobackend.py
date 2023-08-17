@@ -362,6 +362,8 @@ class AutoBackend(nn.Module):
         Returns:
             (tuple): Tuple containing the raw output tensor, and processed output for visualization (if visualize=True)
         """
+        if not isinstance(batch, dict):  # only img
+            batch = {'img': batch}
         im = batch['img']
         b, ch, h, w = im.shape  # batch, channel, height, width
         if self.fp16 and im.dtype != torch.float16:

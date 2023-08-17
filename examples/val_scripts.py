@@ -11,7 +11,7 @@ import pdb
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", default="./weights_test_onnx", type=str)
-parser.add_argument("--project", default="val_fold", type=str)
+parser.add_argument("--project", default="val-fold", type=str)
 parser.add_argument("--iou", default=0.65, type=float)
 parser.add_argument("--conf", default=0.25, type=float)
 parser.add_argument("--data", default="../ultralytics/datasets/coco1.yaml", type=str, help="val data, default: coco val2017")
