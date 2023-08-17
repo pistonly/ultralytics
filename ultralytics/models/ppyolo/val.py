@@ -11,6 +11,7 @@ from ultralytics.data.augment import Compose, Format, v8_transforms
 from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.utils import colorstr, ops
 from ultralytics.utils.torch_utils import de_parallel
+from ultralytics.utils.plotting import plot_images, output_to_target
 import pdb
 
 __all__ = 'PPYOLOValidator',  # tuple or list
@@ -94,7 +95,7 @@ class PPYOLOValidator(DetectionValidator):
             # Predictions
             if self.args.single_cls:
                 pred[:, 5] = 0
-            predn = pred.clone()  # paddle model scaled in model
+            predn = pred.clone()  # paddle model scaled in model, native-space xyxy, conf, cls
 
             # Evaluate
             if nl:
@@ -115,3 +116,22 @@ class PPYOLOValidator(DetectionValidator):
             if self.args.save_txt:
                 file = self.save_dir / 'labels' / f'{Path(batch["im_file"][si]).stem}.txt'
                 self.save_one_txt(predn, self.args.save_conf, shape, file)
+
+    def plot_predictions(self, batch, preds, ni):
+        '''
+        preds: list[(x1, y1, x2, y2, conf, cls)], unscaled bboxes by pp-model. Need to rescale to input image size.
+        '''
+        img = batch['img']  # scaled image for model
+        scale_factor = batch['scale_factor']  # new / old
+        preds_new = []
+        for i, pred in enumerate(preds):
+            bboxes = pred[:, :4]
+            # rescale bboxes
+            bboxes[:, [0, 2]] *= scale_factor[i][1]
+            bboxes[:, [1, 3]] *= scale_factor[i][0]
+            preds_new.append(pred)
+        plot_images(img, *output_to_target(preds_new, max_det=self.args.max_det),
+                    paths=batch['im_file'],
+                    fname=self.save_dir / f'val_batch{ni}_pred.jpg',
+                    names=self.names,
+                    on_plot=self.on_plot)
