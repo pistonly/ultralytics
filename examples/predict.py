@@ -21,11 +21,11 @@ flags = parser.parse_args()
 # w = "./weights/yolov6s.onnx"
 # w = "./weights/yolov7-tiny_b1.onnx"
 # w = "./weights/yolov7-tiny_640x640_1output_int8mixfp16_1.bmodel"
-w = "./weights/yolov8n.onnx"
+# w = "./weights/yolov8n.onnx"
 # w = "./weights/yolov8n.pt"
 # w = "./weights/yolov8n_640x640_b-1_fp16_8.5.1.7.engine"
 # w = "./weights/damoyolo_tinynasL20_T_436.onnx"
-# w = "./weights/paddle-ppyoloe-plus-crn-t-auxhead-relu-300e-coco_640x640_b-0.onnx"
+w = "./weights/paddle-ppyoloe-plus-crn-t-auxhead-relu-300e-coco_640x640_b-0.onnx"
 # w = "./weights/paddle-rtdetr-r18vd-6x-coco_640x640_b-0.onnx"
 # w = "./weights/paddle-ppyoloe-plus-crn-t-auxhead-relu-300e-coco_640x640_b-0_int8_minmax_8.5.1.7.engine"
 
@@ -51,7 +51,7 @@ exists_ok = True  # not increase save_dir. If want new results, set it to: False
 args = {'conf': 0.25, 'iou':0.65, 'name':f"predict-{name}", "plots": True, 'project': "runs", 'device': "0",
         'exist_ok': exists_ok, 'replace': flags.replace, 'save': True}
 
-metrics = model(source="../ultralytics/assets", **args)
+metrics = model(source="../ultralytics/assets/", **args)
 if metrics is None:
     print("skiped")
 

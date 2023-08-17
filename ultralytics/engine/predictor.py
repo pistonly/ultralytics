@@ -206,8 +206,9 @@ class BasePredictor:
     def setup_source(self, source):
         """Sets up source and inference mode."""
         self.imgsz = check_imgsz(self.args.imgsz, stride=self.model.stride, min_dim=2)  # check image size
-        self.transforms = getattr(self.model.model, 'transforms', classify_transforms(
-            self.imgsz[0])) if self.args.task == 'classify' else None
+        if self.args.task == 'classify':
+            self.transforms = getattr(self.model.model, 'transforms', classify_transforms(
+                self.imgsz[0]))
         self.dataset = load_inference_source(source=source, imgsz=self.imgsz, vid_stride=self.args.vid_stride)
         self.source_type = self.dataset.source_type
         if not getattr(self, 'stream', True) and (self.dataset.mode == 'stream' or  # streams
@@ -257,6 +258,9 @@ class BasePredictor:
             with profilers[2]:
                 self.results = self.postprocess(preds, im, im0s)
             self.run_callbacks('on_predict_postprocess_end')
+
+            if isinstance(im, dict):
+                im = im['img']
 
             # Visualize, save, write results
             n = len(im0s)

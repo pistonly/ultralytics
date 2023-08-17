@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, Dataset, dataloader, distributed
 from tqdm import tqdm
 import copy
 from .augment import Format
+import pdb
 
 
 def decode_image(img_path):
@@ -14,6 +15,17 @@ def decode_image(img_path):
     data = np.frombuffer(im_read, dtype='uint8')
     im = cv2.imdecode(data, 1)  # BGR mode, but need RGB mode
     im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+    img_info = {
+        "im_shape": np.array(
+            im.shape[:2], dtype=np.float32),
+        "im_shape_ori": np.array(im.shape[:2], dtype=np.float32),
+        "scale_factor": np.array(
+            [1., 1.], dtype=np.float32)
+    }
+    return im, img_info
+
+def process_image_input(BGR_img):
+    im = cv2.cvtColor(BGR_img, cv2.COLOR_BGR2RGB)
     img_info = {
         "im_shape": np.array(
             im.shape[:2], dtype=np.float32),
@@ -268,7 +280,7 @@ class PPFormat(Format):
         labels['resized_shape'] = labels.get('im_shape')  # for rtdetr, which need 'im_shape'
         labels['scale_factor'] = torch.from_numpy(labels.get('scale_factor'))
         labels = super().__call__(labels)
-        return im, labels
+        return labels['img'], labels
 
     def _format_img(self, img):
         """Format the image for YOLOv5 from Numpy array to PyTorch tensor."""
@@ -278,6 +290,28 @@ class PPFormat(Format):
         img = torch.from_numpy(img)
         return img
 
+class PPFormat_predict(object):
+    def __init__(self, device):
+        self.device = device
+
+    def __call__(self, im, labels):
+        labels['ori_shape'] = labels.pop('im_shape_ori', None)
+        labels['resized_shape'] = labels.get('im_shape')  # for rtdetr, which need 'im_shape'
+        labels['scale_factor'] = torch.from_numpy(labels.get('scale_factor'))
+        im = self._format_img(im)
+        labels['img'] = im
+        return im, labels
+
+    def _format_img(self, img):
+        """Format the image for YOLOv5 from Numpy array to PyTorch tensor."""
+        if len(img.shape) < 3:
+            img = np.expand_dims(img, -1)
+        img = np.ascontiguousarray(img)
+        img = torch.from_numpy(img)
+        img = img.to(self.device)
+        return img
+
+
 class PP_Compose:
     def __init__(self, transforms):
         self.transforms = []
@@ -286,8 +320,11 @@ class PP_Compose:
             op_type = new_op_info.pop('type')
             self.transforms.append(eval(op_type)(**new_op_info))
 
-    def __call__(self, img_path, labels):
-        img, im_info = decode_image(img_path)
+    def __call__(self, img_path, labels, BGR_image=None):
+        if BGR_image is None:
+            img, im_info = decode_image(img_path)
+        else:
+            img, im_info = process_image_input(BGR_image)
         labels.update(im_info)
         for t in self.transforms:
             img, labels = t(img, labels)

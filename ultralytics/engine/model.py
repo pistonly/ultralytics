@@ -230,6 +230,12 @@ class Model:
         overrides.update(kwargs)  # prefer kwargs
         overrides['mode'] = kwargs.get('mode', 'predict')
         assert overrides['mode'] in ['track', 'predict']
+        if isinstance(self.model, str):
+            if Path(self.model).name.startswith("paddle") and (self.model.endswith(".onnx") or self.model.endswith(".engine")):
+                config_name = "_".join(Path(self.model).stem.split("_")[:3]) + ".yml"
+                if 'infer_config' not in overrides:
+                    overrides['infer_config'] = str(Path(self.model).parent / "paddle_infer_config" / config_name)
+
         if not is_cli:
             overrides['save'] = kwargs.get('save', False)  # do not save by default if called in Python
         if not self.predictor:
