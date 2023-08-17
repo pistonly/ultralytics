@@ -174,13 +174,23 @@ class AutoBackend(nn.Module):
             Binding = namedtuple('Binding', ('name', 'dtype', 'shape', 'data', 'ptr'))
             logger = trt.Logger(trt.Logger.INFO)
             # Read file
+            read_meta_ok = False
             with open(w, 'rb') as f, trt.Runtime(logger) as runtime:
-                meta_len = int.from_bytes(f.read(4), byteorder='little')  # read metadata length
-                metadata = json.loads(f.read(meta_len).decode('utf-8'))  # read metadata
-                model = runtime.deserialize_cuda_engine(f.read())  # read engine
+                # TODO: check meta data
+                try:
+                    meta_len = int.from_bytes(f.read(4), byteorder='little')  # read metadata length
+                    metadata = json.loads(f.read(meta_len).decode('utf-8'))  # read metadata
+                    model = runtime.deserialize_cuda_engine(f.read())  # read engine
+                    read_meta_ok = True
+                except UnicodeDecodeError as exc:
+                    LOGGER.info("trt read metadata error!")
+            if not read_meta_ok:
+                with open(w, 'rb') as f, trt.Runtime(logger) as runtime:
+                    model = runtime.deserialize_cuda_engine(f.read())  # read engine
+
             context = model.create_execution_context()
             bindings = OrderedDict()
-            output_names = []
+            input_names, output_names = [], []
             fp16 = False  # default updated below
             dynamic = False
             binding_im_name = 'images'

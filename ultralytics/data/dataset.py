@@ -197,11 +197,7 @@ class YOLODataset(BaseDataset):
             if k == 'img':
                 value = torch.stack(value, 0)
             if k in ['masks', 'keypoints', 'bboxes', 'cls']:
-                try:
-                    value = torch.cat(value, 0)
-                except:
-                    print(k)
-                    pdb.set_trace()
+                value = torch.cat(value, 0)
             new_batch[k] = value
         new_batch['batch_idx'] = list(new_batch['batch_idx'])
         for i in range(len(new_batch['batch_idx'])):
@@ -315,6 +311,24 @@ class PPDataset(YOLODataset):
         labels = self.transforms(file_path, labels)
         return labels
 
+    @staticmethod
+    def collate_fn(batch):
+        """Collates data samples into batches."""
+        new_batch = {}
+        keys = batch[0].keys()
+        values = list(zip(*[list(b.values()) for b in batch]))
+        for i, k in enumerate(keys):
+            value = values[i]
+            if k == 'img' or k == 'scale_factor':
+                value = torch.stack(value, 0)
+            if k in ['masks', 'keypoints', 'bboxes', 'cls']:
+                value = torch.cat(value, 0)
+            new_batch[k] = value
+        new_batch['batch_idx'] = list(new_batch['batch_idx'])
+        for i in range(len(new_batch['batch_idx'])):
+            new_batch['batch_idx'][i] += i  # add target image index for build_targets()
+        new_batch['batch_idx'] = torch.cat(new_batch['batch_idx'], 0)
+        return new_batch
 
 class DAMODataset(YOLODataset):
 

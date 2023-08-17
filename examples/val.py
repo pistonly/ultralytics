@@ -23,9 +23,11 @@ flags = parser.parse_args()
 # w = "./weights/yolov7-tiny_640x640_1output_int8mixfp16_1.bmodel"
 # w = "./weights/yolov8n.onnx"
 # w = "./weights/yolov8n.pt"
+# w = "./weights/yolov8n_640x640_b-1_fp16_8.5.1.7.engine"
 # w = "./weights/damoyolo_tinynasL20_T_436.onnx"
 # w = "./weights/paddle-ppyoloe-plus-crn-t-auxhead-relu-300e-coco_640x640_b-0.onnx"
-w = "./weights/paddle-rtdetr-r18vd-6x-coco_640x640_b-0.onnx"
+# w = "./weights/paddle-rtdetr-r18vd-6x-coco_640x640_b-0.onnx"
+w = "./weights/paddle-ppyoloe-plus-crn-t-auxhead-relu-300e-coco_640x640_b-0_int8_minmax_8.5.1.7.engine"
 
 if not flags.w:
     flags.w = w
