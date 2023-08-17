@@ -47,6 +47,13 @@ ENV OMP_NUM_THREADS=1
 # Avoid DDP error "MKL_THREADING_LAYER=INTEL is incompatible with libgomp.so.1 library" https://github.com/pytorch/pytorch/issues/37377
 ENV MKL_THREADING_LAYER=GNU
 
+# set pip image
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# install tensorrt, onnx, onnxruntime-gpu
+RUN pip install onnx onnxruntime-gpu
+RUN pip install tensorrt
+
 
 # Usage Examples -------------------------------------------------------------------------------------------------------
 

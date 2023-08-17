@@ -13,10 +13,16 @@ when conf=0.001, it can't filter out bboxes in predictions in yolov6, pp-yolo, d
 
 if set conf=0.25 it will be fast. Because yolov8 has more sharp confidence distribution. see branch statics-prediction.
 
-* TODO docker support tensorRT>8.4 and onnxruntime-gpu 
+* DONE docker support tensorRT>8.4 and onnxruntime-gpu 
+CLOSED: [2023-08-17 四 10:59]
 :LOGBOOK:
+- State "DONE"       from "TODO"       [2023-08-17 四 10:59]
 - State "TODO"       from              [2023-08-16 三 18:57]
 :END:
+docker based on pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+pip install tensorrt==8.5.1.7
+see ./docker/Dockerfile-local
+
 
 * TODO support eval, support ppyoloe-objects365
 :LOGBOOK:
