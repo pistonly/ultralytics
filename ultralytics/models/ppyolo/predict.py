@@ -18,8 +18,8 @@ class DetectionPredictor(BasePredictor):
         self.transforms = PP_Compose(yml_conf['Preprocess'])
         self.transforms.append(PPFormat_predict(device=self.device))
 
-        name_list = yml_conf['label_list']
-        self.names = {i: name_i for i, name_i in enumerate(name_list)}
+        name_list = yml_conf.get('label_list', None)
+        self.names = {i: name_i for i, name_i in enumerate(name_list)} if name_list else None
 
     def postprocess(self, preds, img, orig_imgs):
         """Post-processes predictions and returns a list of Results objects."""
@@ -43,14 +43,12 @@ class DetectionPredictor(BasePredictor):
                                             classes=self.args.classes,
                                             multi_label=True,
                                             box_is_xyxy=True)
-
-
         results = []
         for i, pred in enumerate(preds):
             orig_img = orig_imgs[i] if isinstance(orig_imgs, list) else orig_imgs
             path = self.batch[0]
             img_path = path[i] if isinstance(path, list) else path
-            results.append(Results(orig_img=orig_img, path=img_path, names=self.names, boxes=pred))
+            results.append(Results(orig_img=orig_img, path=img_path, names=self.names or self.model.names, boxes=pred))
         return results
 
     def pre_transform(self, im):
