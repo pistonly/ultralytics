@@ -24,8 +24,10 @@ pip install tensorrt==8.5.1.7
 see ./docker/Dockerfile-local
 
 
-* TODO support predict, support ppyoloe-objects365
+* DONE support predict, support ppyoloe-objects365
+CLOSED: [2023-08-21 一 14:02]
 :LOGBOOK:
+- State "DONE"       from "TODO"       [2023-08-21 一 14:02]
 - State "TODO"       from              [2023-08-16 三 18:58]
 :END:
 
