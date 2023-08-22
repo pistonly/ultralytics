@@ -1,8 +1,9 @@
 * default settings
 - datasets_dir: for relative dataset path
   utils.__init__.py/get_user_config_dir() setting datasets_dir: ~/.config/Ultralytics-compare/settings.yaml
-  
-* DONE yolov6, damo-yolo, pp-yolo postprocess slowly
+
+* todo list
+** DONE yolov6, damo-yolo, pp-yolo postprocess slowly
 CLOSED: [2023-08-16 三 18:30]
 :LOGBOOK:
 - State "DONE"       from "TODO"       [2023-08-16 三 18:30]
@@ -13,7 +14,7 @@ when conf=0.001, it can't filter out bboxes in predictions in yolov6, pp-yolo, d
 
 if set conf=0.25 it will be fast. Because yolov8 has more sharp confidence distribution. see branch statics-prediction.
 
-* DONE docker support tensorRT>8.4 and onnxruntime-gpu 
+** DONE docker support tensorRT>8.4 and onnxruntime-gpu 
 CLOSED: [2023-08-17 四 10:59]
 :LOGBOOK:
 - State "DONE"       from "TODO"       [2023-08-17 四 10:59]
@@ -24,16 +25,165 @@ pip install tensorrt==8.5.1.7
 see ./docker/Dockerfile-local
 
 
-* DONE support predict, support ppyoloe-objects365
+** DONE support predict, support ppyoloe-objects365
 CLOSED: [2023-08-21 一 14:02]
 :LOGBOOK:
 - State "DONE"       from "TODO"       [2023-08-21 一 14:02]
 - State "TODO"       from              [2023-08-16 三 18:58]
 :END:
 
-* DONE rtdetr onnx model error: ('im_shape',)
+** DONE rtdetr onnx model error: ('im_shape',)
 CLOSED: [2023-08-17 四 02:33]
 :LOGBOOK:
 - State "DONE"       from "TODO"       [2023-08-17 四 02:33]
 - State "TODO"       from              [2023-08-16 三 22:25]
 :END:
+
+** DONE speed of bmodel is too long than the results of bmrt_test
+CLOSED: [2023-06-02 五 14:42]
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2023-06-02 五 14:42]
+- State "TODO"       from              [2023-05-09 二 19:21]
+:END:
+io between host and device is bottle-neck.
+*** profile
+#+begin_example
+bmodel infer cost: 5.4836273193359375e-06, 0.01086878776550293, 5.4836273193359375e-06
+bmodel infer cost_global: 1.2636184692382812e-05, 0.010911703109741211(=sum(bmodel_infer_cost))
+from_numpy: 0.00086212158203125
+profile dt: 0.011846065521240234
+#+end_example
+so python test is 10.8ms, torch.from_numpy is expensive(0.8ms)
+
+bmrt_test: 4~5ms
+*** test using sophon example
+#+begin_src json
+    {
+        "info": {
+            "model": "yolov7-tiny",
+            "height": 640,
+            "width": 640,
+            "output_num": 1,
+            "precision": "int8mixfp16",
+            "batch": 1
+        },
+        "speed": {
+            "load input time(s)": 0.001133,
+            "calculate  time(s)": 0.004363,
+            "get output time(s)": 0.00697,
+            "compare    time(s)": 0.002589
+        }
+    }
+#+end_src
+** TODO compare end2end 
+:LOGBOOK:
+- State "TODO"       from              [2023-08-22 二 18:44]
+:END:
+
+* autobackend
+
+| yolov8   | .pt | .engine | .onnx | .bmodel |
+| yolov5   |     | .engine | .onnx | .bmodel |
+| yolov6   |     | .engine | .onnx | .bmodel |
+| yolov7   |     | .engine | .onnx | .bmodel |
+| ppyolo   |     | .engine | .onnx |         |
+| rtdetr   |     | .engine | .onnx |         |
+| damoyolo |     | .engine | .onnx |         |
+
+* conclusion
+- 支持多个模型、多个后台的统一比较, 结果更加公平。
+- 测试流程简单，可脚本自动化
+- 交互式结果对比展示
+- 方便添加新的模型、后台的支持
+- 量化能有效提高模型性能
+- 不同的硬件结果不同
+- yolov6 小模型 PTQ 精度损失明显, 需要 QAT
+- rt-detr no need NMS(0.7ms-1ms)
+
+  
+* paddle model
+NOTE: if don't set args.is_pp and args.infer_config, onnx model must start with "paddle", and using the default infer_config path
+~args.infer_config = Path(self.model).parent / "paddle_infer_config" / Path(self.model).with_suffix(".yml").name~
+
+** pp-yolo
+*** box
+return: xyxy in native space
+
+** rt-detr
+*** need tensorrt >= 8.5.1
+
+* speed
+** tensorRT
+*** onnx2trt
+ detection_deploy/TRT/onnx_to_trt_script.py
+*** get speed 
+#+begin_src bash
+  cd trt_tools
+  python eval_tensorrt_speed.py
+  python parser_tensorrt_speed.py
+#+end_src
+* precision
+** engine fp16, int8
+#+begin_src bash
+  cd examples
+  python val_scripts.py --model_dir ./weights_test_engine 
+#+end_src
+** onnx
+#+begin_src bash
+  cd examples
+  python val_scripts.py --model_dir ./weights_test_onnx
+#+end_src
+
+* steps
+1. get onnx & change name format
+2. export to .engine model \\
+   [[*onnx2trt][onnx2trt]]
+3. eval .engine model
+4. eval trtexec speed
+5. eval mAP
+  
+* model graph
+
+** yolov5
+#+caption: yolov5 graph
+#+attr_html: :width 800
+[[file:ultralytics/assets/yolov5_mmyolo.jpg]]
+
+#+caption: yolov5 p6 graph
+#+attr_html: :width 800
+[[file:ultralytics/assets/yolov5_p6_mmyolo.jpg]]
+
+** yolov6
+#+caption: yolov6 graph
+#+attr_html: :width 800
+[[file:ultralytics/assets/yolov6l_mmyolo.png]]
+
+** yolov7
+#+caption: yolov7 graph
+#+attr_html: :width 800
+[[file:ultralytics/assets/yolov7l_mmyolo.png]]
+
+** yolov8
+#+caption: yolov8 graph
+#+attr_html: :width 800
+[[file:ultralytics/assets/yolov8_mmyolo.jpg]]
+
+** yolov5 vs yolov5u vs yolov8
+#+caption: v5 v5u v8 configure
+#+attr_html: :width 1200
+[[file:ultralytics/assets/yolov5_vs_5u_vs_8.png]]
+
+#+caption: c3 vs c2f
+#+attr_html: :width 300
+|[[file:ultralytics/assets/C3_n1.png]]|[[file:ultralytics/assets/c2f_n1.png]]|
+
+* predict distribution
+
+#+caption: yolov5,7,8 have sharp peak at 0 point, ppyoloe,damoyolo,yolov6 do not have peak at 0 point. It causes PostProcess costs too much when setting conf=0.001.
+#+attr_html: :width 800
+[[file:ultralytics/assets/predict_disctibution_0.png]]
+
+#+caption: {yolov7}, {yolov5, 8}, {yolov6, ppyolo, damoyolo} form 3 groups. yolov8 group's distributions grow up after conf > 0.9.
+#+attr_html: :width 800
+[[file:ultralytics/assets/predict_disctibution_1.png]]
+
