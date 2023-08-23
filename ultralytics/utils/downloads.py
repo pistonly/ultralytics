@@ -93,7 +93,7 @@ def zip_directory(directory, compress=True, exclude=('.DS_Store', '__MACOSX'), p
         raise FileNotFoundError(f"Directory '{directory}' does not exist.")
 
     # Unzip with progress bar
-    files_to_zip = [f for f in directory.rglob('*') if f.is_file() and not any(x in f.name for x in exclude)]
+    files_to_zip = [f for f in directory.rglob('*') if f.is_file() and all(x not in f.name for x in exclude)]
     zip_file = directory.with_suffix('.zip')
     compression = ZIP_DEFLATED if compress else ZIP_STORED
     with ZipFile(zip_file, 'w', compression) as f:
@@ -185,11 +185,9 @@ def check_disk_space(url='https://ultralytics.com/assets/coco128.zip', sf=1.5, h
                 f'Please free {data * sf - free:.1f} GB additional disk space and try again.')
         if hard:
             raise MemoryError(text)
-        else:
-            LOGGER.warning(text)
-            return False
+        LOGGER.warning(text)
+        return False
 
-            # Pass if error
     return True
 
 
@@ -214,21 +212,18 @@ def get_google_drive_file_info(link):
     """
     file_id = link.split('/d/')[1].split('/view')[0]
     drive_url = f'https://drive.google.com/uc?export=download&id={file_id}'
+    filename = None
 
     # Start session
-    filename = None
     with requests.Session() as session:
         response = session.get(drive_url, stream=True)
         if 'quota exceeded' in str(response.content.lower()):
             raise ConnectionError(
                 emojis(f'❌  Google Drive file download quota exceeded. '
                        f'Please try again later or download this file manually at {link}.'))
-        token = None
-        for key, value in response.cookies.items():
-            if key.startswith('download_warning'):
-                token = value
-        if token:
-            drive_url = f'https://drive.google.com/uc?export=download&confirm={token}&id={file_id}'
+        for k, v in response.cookies.items():
+            if k.startswith('download_warning'):
+                drive_url += f'&confirm={v}'  # v is token
         cd = response.headers.get('content-disposition')
         if cd:
             filename = re.findall('filename="(.+)"', cd)[0]
@@ -332,6 +327,9 @@ def get_github_assets(repo='ultralytics/assets', version='latest', retry=False):
     r = requests.get(url)  # github api
     if r.status_code != 200 and retry:
         r = requests.get(url)  # try again
+    if r.status_code != 200:
+        LOGGER.warning(f'⚠️ GitHub assets check failure for {url}: {r.status_code} {r.reason}')
+        return '', []
     data = r.json()
     return data['tag_name'], [x['name'] for x in data['assets']]  # tag, assets
 

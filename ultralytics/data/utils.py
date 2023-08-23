@@ -58,6 +58,31 @@ def exif_size(img: Image.Image):
     return s
 
 
+def verify_image(args):
+    """Verify one image."""
+    im_file, prefix = args
+    # Number (found, corrupt), message
+    nf, nc, msg = 0, 0, ''
+    try:
+        im = Image.open(im_file)
+        im.verify()  # PIL verify
+        shape = exif_size(im)  # image size
+        shape = (shape[1], shape[0])  # hw
+        assert (shape[0] > 9) & (shape[1] > 9), f'image size {shape} <10 pixels'
+        assert im.format.lower() in IMG_FORMATS, f'invalid image format {im.format}'
+        if im.format.lower() in ('jpg', 'jpeg'):
+            with open(im_file, 'rb') as f:
+                f.seek(-2, 2)
+                if f.read() != b'\xff\xd9':  # corrupt JPEG
+                    ImageOps.exif_transpose(Image.open(im_file)).save(im_file, 'JPEG', subsampling=0, quality=100)
+                    msg = f'{prefix}WARNING ⚠️ {im_file}: corrupt JPEG restored and saved'
+        nf = 1
+    except Exception as e:
+        nc = 1
+        msg = f'{prefix}WARNING ⚠️ {im_file}: ignoring corrupt image/label: {e}'
+    return im_file, nf, nc, msg
+
+
 def verify_image_label(args):
     """Verify one image-label pair."""
     im_file, lb_file, prefix, keypoint, num_cls, nkpt, ndim = args
@@ -205,7 +230,7 @@ def check_det_dataset(dataset, autodownload=True):
         data = next((DATASETS_DIR / new_dir).rglob('*.yaml'))
         extract_dir, autodownload = data.parent, False
 
-    # Read yaml (optional)
+    # Read YAML (optional)
     if isinstance(data, (str, Path)):
         data = yaml_load(data, append_filename=True)  # dictionary
 
@@ -245,7 +270,7 @@ def check_det_dataset(dataset, autodownload=True):
             else:
                 data[k] = [str((path / x).resolve()) for x in data[k]]
 
-    # Parse yaml
+    # Parse YAML
     train, val, test, s = (data.get(x) for x in ('train', 'val', 'test', 'download'))
     if val:
         val = [Path(x).resolve() for x in (val if isinstance(val, list) else [val])]  # val path
@@ -322,12 +347,12 @@ def check_cls_dataset(dataset: str, split=''):
     # Print to console
     for k, v in {'train': train_set, 'val': val_set, 'test': test_set}.items():
         if v is None:
-            LOGGER.info(colorstr(k) + f': {v}')
+            LOGGER.info(f'{colorstr(k)}: {v}')
         else:
             files = [path for path in v.rglob('*.*') if path.suffix[1:].lower() in IMG_FORMATS]
             nf = len(files)  # number of files
             nd = len({file.parent for file in files})  # number of directories
-            LOGGER.info(colorstr(k) + f': {v}... found {nf} images in {nd} classes ✅ ')  # keep trailing space
+            LOGGER.info(f'{colorstr(k)}: {v}... found {nf} images in {nd} classes ✅ ')  # keep trailing space
 
     return {'train': train_set, 'val': val_set or test_set, 'test': test_set or val_set, 'nc': nc, 'names': names}
 
