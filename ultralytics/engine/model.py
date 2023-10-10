@@ -227,8 +227,8 @@ class Model(nn.Module):
         if isinstance(self.model, str):
             if Path(self.model).name.startswith("paddle") and (self.model.endswith(".onnx") or self.model.endswith(".engine")):
                 config_name = "_".join(Path(self.model).stem.split("_")[:3]) + ".yml"
-                if 'infer_config' not in overrides:
-                    overrides['infer_config'] = str(Path(self.model).parent / "paddle_infer_config" / config_name)
+                if 'infer_config' not in args:
+                    args['infer_config'] = str(Path(self.model).parent / "paddle_infer_config" / config_name)
 
         if not self.predictor:
             self.predictor = (predictor or self._smart_load('predictor'))(overrides=args, _callbacks=self.callbacks)

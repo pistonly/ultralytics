@@ -42,6 +42,7 @@ from ultralytics.utils import DEFAULT_CFG, LOGGER, MACOS, WINDOWS, callbacks, co
 from ultralytics.utils.checks import check_imgsz, check_imshow
 from ultralytics.utils.files import increment_path
 from ultralytics.utils.torch_utils import select_device, smart_inference_mode
+from ultralytics.data.pp_transforms import PP_Compose
 
 STREAM_WARNING = """
 WARNING ⚠️ inference results will accumulate in RAM unless `stream=True` is passed, causing potential out-of-memory
@@ -202,8 +203,9 @@ class BasePredictor:
     def setup_source(self, source):
         """Sets up source and inference mode."""
         self.imgsz = check_imgsz(self.args.imgsz, stride=self.model.stride, min_dim=2)  # check image size
-        self.transforms = getattr(self.model.model, 'transforms', classify_transforms(
-            self.imgsz[0])) if self.args.task == 'classify' else None
+        if not isinstance(self.transforms, PP_Compose):
+            self.transforms = getattr(self.model.model, 'transforms', classify_transforms(
+                self.imgsz[0])) if self.args.task == 'classify' else None
         self.dataset = load_inference_source(source=source,
                                              imgsz=self.imgsz,
                                              vid_stride=self.args.vid_stride,

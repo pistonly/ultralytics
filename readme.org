@@ -187,3 +187,9 @@ return: xyxy in native space
 #+attr_html: :width 800
 [[file:ultralytics/assets/predict_disctibution_1.png]]
 
+* issue
+** ppyolo predict transforms is None [001]
+setup_source override transforms.
+** override not defined [002]
+using args directly
+
