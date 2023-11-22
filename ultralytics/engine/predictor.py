@@ -269,6 +269,7 @@ class BasePredictor:
                     self.results = self.postprocess(preds, im, im0s)
 
                 self.run_callbacks('on_predict_postprocess_end')
+
                 # Visualize, save, write results
                 n = len(im0s)
                 for i in range(n):
@@ -281,7 +282,7 @@ class BasePredictor:
                     p = Path(p)
 
                     if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
-                        s += self.write_results(i, self.results, (p, im, im0))
+                        s += self.write_results(i, self.results, (p, im['img'] if isinstance(im, dict) else im, im0))
                     if self.args.save or self.args.save_txt:
                         self.results[i].save_dir = self.save_dir.__str__()
                     if self.args.show and self.plotted_img is not None:
