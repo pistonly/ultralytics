@@ -211,6 +211,8 @@ using args directly
 validator add attribute model.
 ** export error: ValueError: too many values to unpack (expected 12) [004]
 add sophon
+** train error: valid step error[005]
+
 * default configurations
 ~ultralytics/cfg/default.yaml~
 

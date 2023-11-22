@@ -12,6 +12,7 @@ from ultralytics.utils import LOGGER, ops
 from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.metrics import ConfusionMatrix, DetMetrics, box_iou
 from ultralytics.utils.plotting import output_to_target, plot_images
+from ultralytics.nn.autobackend import AutoBackend
 
 
 class DetectionValidator(BaseValidator):
@@ -83,7 +84,8 @@ class DetectionValidator(BaseValidator):
         """
 
         # onnx end2end
-        if self.model.onnx and len(self.model.output_names) > 1:
+        # TODO: modify end2end
+        if isinstance(self.model, AutoBackend) and self.model.onnx and len(self.model.output_names) > 1:
             # ['num_dets', 'det_boxes', 'det_scores', 'det_classes']
             num_dets, det_boxes, det_scores, det_classes = preds
             batch = num_dets.shape[0]

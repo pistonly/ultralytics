@@ -168,7 +168,7 @@ class BaseValidator:
 
             # Inference
             with dt[1]:
-                preds = model(batch, augment=augment)
+                preds = model(batch['img'] if self.training else batch, augment=augment)
 
             # Loss
             with dt[2]:
