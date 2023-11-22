@@ -200,6 +200,7 @@ return: xyxy in native space
   ln -s /home/liuyang/datasets/coco coco
 #+end_src
 
+* train
 
 * issue
 ** ppyolo predict transforms is None [001]
@@ -208,3 +209,5 @@ setup_source override transforms.
 using args directly
 ** val error: AttributeError: 'DetectionValidator' object has no attribute 'model' [003]
 validator add attribute model.
+** export error: ValueError: too many values to unpack (expected 12) [004]
+add sophon
