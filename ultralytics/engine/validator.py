@@ -90,6 +90,7 @@ class BaseValidator:
         self.nc = None
         self.iouv = None
         self.jdict = None
+        self.model = None
         self.speed = {'preprocess': 0.0, 'inference': 0.0, 'loss': 0.0, 'postprocess': 0.0}
 
         self.save_dir = save_dir or get_save_dir(self.args)
@@ -114,7 +115,7 @@ class BaseValidator:
             self.args.half = self.device.type != 'cpu'  # force FP16 val during training
             model = trainer.ema.ema or trainer.model
             model = model.half() if self.args.half else model.float()
-            # self.model = model
+            self.model = model
             self.loss = torch.zeros_like(trainer.loss_items, device=trainer.device)
             self.args.plots &= trainer.stopper.possible_stop or (trainer.epoch == trainer.epochs - 1)
             model.eval()
@@ -125,7 +126,7 @@ class BaseValidator:
                                 dnn=self.args.dnn,
                                 data=self.args.data,
                                 fp16=self.args.half)
-            # self.model = model
+            self.model = model
             self.device = model.device  # update device
             self.args.half = model.fp16  # update half
             stride, pt, jit, engine = model.stride, model.pt, model.jit, model.engine

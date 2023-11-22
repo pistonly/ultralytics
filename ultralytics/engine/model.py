@@ -274,14 +274,13 @@ class Model(nn.Module):
         """
         custom = {'rect': True}  # method defaults
         args = {**self.overrides, **custom, **kwargs, 'mode': 'val'}  # highest priority args on the right
-
-        validator = (validator or self._smart_load('validator'))(args=args, _callbacks=self.callbacks)
-
         if isinstance(self.model, str):
             if Path(self.model).name.startswith("paddle") and (self.model.endswith(".onnx") or self.model.endswith(".engine")):
                 config_name = "_".join(Path(self.model).stem.split("_")[:3]) + ".yml"
-                if not args.infer_config:
-                    args.infer_config = str(Path(self.model).parent / "paddle_infer_config" / config_name)
+                if 'infer_config' not in args:
+                    args['infer_config'] = str(Path(self.model).parent / "paddle_infer_config" / config_name)
+
+        validator = (validator or self._smart_load('validator'))(args=args, _callbacks=self.callbacks)
 
         validator(model=self.model)
         self.metrics = validator.metrics
