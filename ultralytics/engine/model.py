@@ -281,6 +281,10 @@ class Model(nn.Module):
                     args['infer_config'] = str(Path(self.model).parent / "paddle_infer_config" / config_name)
 
         validator = (validator or self._smart_load('validator'))(args=args, _callbacks=self.callbacks)
+        self.save_dir = validator.save_dir
+        print(f"save_dir: {self.save_dir}")
+        if (not args["replace"]) and (Path(validator.save_dir) / "stats_mean.json").is_file():
+            return None
 
         validator(model=self.model)
         self.metrics = validator.metrics

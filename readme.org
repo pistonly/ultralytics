@@ -212,6 +212,8 @@ validator add attribute model.
 ** export error: ValueError: too many values to unpack (expected 12) [004]
 add sophon
 ** train error: valid step error[005]
+** replace args not working [006]
+update engine/model.py:val
 
 * default configurations
 ~ultralytics/cfg/default.yaml~
