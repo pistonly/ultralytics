@@ -100,7 +100,6 @@ bmrt_test: 4~5ms
 - yolov6 小模型 PTQ 精度损失明显, 需要 QAT
 - rt-detr no need NMS(0.7ms-1ms)
 
-  
 * paddle model
 NOTE: if don't set args.is_pp and args.infer_config, onnx model must start with "paddle", and using the default infer_config path
 ~args.infer_config = Path(self.model).parent / "paddle_infer_config" / Path(self.model).with_suffix(".yml").name~

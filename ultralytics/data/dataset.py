@@ -19,6 +19,7 @@ from .damo_transforms import DAMO_Compose, DAMO_Padding_UL
 from .damo_transforms import DAMO_Resize, DAMO_RandomHorizontalFlip, DAMO_ToTensor, DAMO_Normalize, DAMOFormat
 from .base import BaseDataset
 from .utils import HELP_URL, LOGGER, get_hash, img2label_paths, verify_image, verify_image_label
+from .hisi_transforms import OMFormat
 
 # Ultralytics dataset *.cache version, >= 1.0.0 for YOLOv8
 DATASET_CACHE_VERSION = '1.0.3'
@@ -432,3 +433,42 @@ class DAMODataset(YOLODataset):
         labels = self.update_labels_info(self.labels[index].copy())
         labels = self.transforms(file_path, labels)
         return labels
+
+
+class OMDataset(YOLODataset):
+    def build_transforms(self, hyp=None):
+        """Builds and appends transforms to the list."""
+        if self.augment:
+            hyp.mosaic = hyp.mosaic if self.augment and not self.rect else 0.0
+            hyp.mixup = hyp.mixup if self.augment and not self.rect else 0.0
+            transforms = v8_transforms(self, self.imgsz, hyp)
+        else:
+            transforms = Compose([LetterBox(new_shape=(self.imgsz, self.imgsz), scaleup=False)])
+        transforms.append(
+            OMFormat(bbox_format='xywh',
+                   normalize=True,
+                   return_mask=self.use_segments,
+                   return_keypoint=self.use_keypoints,
+                   batch_idx=True,
+                   mask_ratio=hyp.mask_ratio,
+                   mask_overlap=hyp.overlap_mask))
+        return transforms
+
+    @staticmethod
+    def collate_fn(batch):
+        """Collates data samples into batches."""
+        new_batch = {}
+        keys = batch[0].keys()
+        values = list(zip(*[list(b.values()) for b in batch]))
+        for i, k in enumerate(keys):
+            value = values[i]
+            if k == 'img':
+                value = np.stack(value, 0)
+            if k in ['masks', 'keypoints', 'bboxes', 'cls']:
+                value = torch.cat(value, 0)
+            new_batch[k] = value
+        new_batch['batch_idx'] = list(new_batch['batch_idx'])
+        for i in range(len(new_batch['batch_idx'])):
+            new_batch['batch_idx'][i] += i  # add target image index for build_targets()
+        new_batch['batch_idx'] = torch.cat(new_batch['batch_idx'], 0)
+        return new_batch

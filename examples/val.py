@@ -2,7 +2,7 @@ import sys
 
 sys.path.insert(0, "../")
 
-from ultralytics import YOLO, PPYOLO, DAMOYOLO
+from ultralytics import YOLO, PPYOLO, DAMOYOLO, HisiOM
 from pathlib import Path
 import pdb
 
@@ -25,9 +25,12 @@ flags = parser.parse_args()
 # w = "./weights/yolov8n.pt"
 # w = "./weights/yolov8n_640x640_b-1_fp16_8.5.1.7.engine"
 # w = "./weights/damoyolo_tinynasL20_T_436.onnx"
-w = "./weights/paddle-ppyoloe-plus-crn-t-auxhead-relu-300e-coco_640x640_b-0.onnx"
+# w = "./weights/paddle-ppyoloe-plus-crn-t-auxhead-relu-300e-coco_640x640_b-0.onnx"
 # w = "./weights/paddle-rtdetr-r18vd-6x-coco_640x640_b-0.onnx"
 # w = "./weights/paddle-ppyoloe-plus-crn-t-auxhead-relu-300e-coco_640x640_b-0_int8_minmax_8.5.1.7.engine"
+w = "./weights/yolov8n_640x640_1_FP16_original.om"
+# w = "./weights/yolov8n_640x640_2_mix_original.om"
+# w = "./weights/yolov8n_640x640_3_S8_original.om"
 
 if not flags.w:
     flags.w = w
@@ -39,6 +42,8 @@ if model_name.startswith("paddle"):
     model_cls = PPYOLO
 elif model_name.startswith("damo"):
     model_cls = DAMOYOLO
+elif model_name.endswith(".om"):
+    model_cls = HisiOM
 else:
     model_cls = YOLO
 model = model_cls(flags.w, task="detect")

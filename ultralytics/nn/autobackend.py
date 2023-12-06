@@ -92,7 +92,7 @@ class AutoBackend(nn.Module):
         super().__init__()
         w = str(weights[0] if isinstance(weights, list) else weights)
         nn_module = isinstance(weights, torch.nn.Module)
-        pt, jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs, paddle, ncnn, bmodel, triton = \
+        pt, jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs, paddle, ncnn, bmodel, triton, om = \
             self._model_type(w)
         fp16 &= pt or jit or onnx or xml or engine or nn_module or triton  # FP16
         nhwc = coreml or saved_model or pb or tflite or edgetpu  # BHWC formats (vs torch BCWH)
@@ -326,6 +326,16 @@ class AutoBackend(nn.Module):
                                   input_model=0, # use opencv
                                   )
             batch_size, net_c, net_h, net_w = net.inputs_shapes[0]
+        elif om:
+            LOGGER.info("start om on board")
+            cuda = False
+            try:
+                from ultralytics.nn.modules import hisi_board_infer
+            except ImportError as e:
+                LOGGER.error("can't find hisi package")
+                raise ImportError(e.args)
+            board_model = hisi_board_infer(w)
+
         else:
             from ultralytics.engine.exporter import export_formats
             raise TypeError(f"model='{w}' is not a supported model format. "
@@ -430,6 +440,10 @@ class AutoBackend(nn.Module):
             y = self.net.infer_numpy([im])
             # t2 = time.time()
             # print(f"bmodel infer cost_global: {t1 - t0}, {t2 - t1}")
+        elif self.om:
+            y = self.board_model.get_outputs(b)
+            y = torch.from_numpy(y)
+
         elif self.coreml:  # CoreML
             im = im[0].cpu().numpy()
             im_pil = Image.fromarray((im * 255).astype('uint8'))
@@ -569,11 +583,17 @@ class AutoBackend(nn.Module):
         types = [s in name for s in sf]
         types[5] |= name.endswith('.mlmodel')  # retain support for older Apple CoreML *.mlmodel formats
         types[8] &= not types[9]  # tflite &= not edgetpu
+        
         if any(types):
             triton = False
+            om = False
+        elif Path(p).suffix == ".om":
+            om = True
+            triton = False
         else:
+            om = False
             from urllib.parse import urlsplit
             url = urlsplit(p)
             triton = url.netloc and url.path and url.scheme in {'http', 'grpc'}
 
-        return types + [triton]
+        return types + [triton, om]

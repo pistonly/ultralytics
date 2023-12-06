@@ -1,3 +1,3 @@
 from .model import PPYOLO
 
-__all__ = "PPYOLO"
+__all__ = "PPYOLO",
