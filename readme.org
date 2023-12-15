@@ -213,7 +213,7 @@ add sophon
 ** train error: valid step error[005]
 ** replace args not working [006]
 update engine/model.py:val
-
+** yolov8.om 3output return wrong bboxes[007]
 * default configurations
 ~ultralytics/cfg/default.yaml~
 

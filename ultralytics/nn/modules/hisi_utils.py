@@ -431,21 +431,36 @@ class BoardInfer(object):
         return str(target_path / file_path_p.name)
 
 
-def dfl(box_p):
+def dfl(box_p, box_first=False):
+    '''
+    box_first: box_p's order is bx4xregxa, else bxregx4xa. box_first need transpose in yolov8's dfl.
+    default is False
+    '''
     b, c, a = box_p.shape  # batch, channel, anchors
     reg_max = int(c / 4)
-    box_p = box_p.reshape(b, 4, reg_max, a)
-    # (1, 4, 16, 8400)
-    box_exp = np.exp(box_p)
-    # (1, 4, 1, 8400)
-    box_sum = np.sum(box_exp, 2, keepdims=True)
-    box_p = box_exp / box_sum
+    if box_first:
+        box_p = box_p.reshape(b, 4, reg_max, a)
+        # (1, 4, 16, 8400)
+        box_exp = np.exp(box_p)
+        # (1, 4, 1, 8400)
+        box_sum = np.sum(box_exp, 2, keepdims=True)
+        box_p = box_exp / box_sum
 
-    local_encode = np.arange(reg_max).reshape((-1, 1))
-    box_p = box_p.transpose((0, 1, 3, 2)).reshape((-1, reg_max))
-    box_p = box_p.dot(local_encode)
+        local_encode = np.arange(reg_max).reshape((-1, 1))
+        box_p = box_p.transpose((0, 1, 3, 2)).reshape((-1, reg_max))
+        box_p = box_p.dot(local_encode)
+    else:
+        box_p = box_p.reshape(b, reg_max, 4, a)
+        # (1, 16, 4, 8400)
+        box_exp = np.exp(box_p)
+        # (1, 1, 4, 8400)
+        box_sum = np.sum(box_exp, 1, keepdims=True)
+        box_p = box_exp / box_sum
+
+        local_encode = np.arange(reg_max).reshape((-1, 1))
+        box_p = box_p.transpose((0, 2, 3, 1)).reshape((-1, reg_max))
+        box_p = box_p.dot(local_encode)
     return box_p.reshape((b, 4, a))
-
 
 def meshgrid(i_s, j_s):
     '''
@@ -509,11 +524,11 @@ def forward_on_2output_numpy(preds):
     return y
 
 
-def forward_on_3output_numpy(preds, batch, no, reg_max, anchors, strides_sq, xywh=False):
+def forward_on_3output_numpy(preds, batch, no, reg_max, anchors, strides_sq, xywh=False, box_first=False):
     # x_cat shape: (1, 144, 8400)
     x_cat = np.concatenate([preds_i.reshape(batch, no, -1) for preds_i in preds], 2)
     box, cls = x_cat[:, 0:reg_max * 4], x_cat[:, reg_max * 4:]
-    box = dfl(box)
+    box = dfl(box, box_first=box_first)
     # dbox:(1, 4, 8400)
     dbox = dist2bbox_numpy(box, anchors, xywh=xywh) * strides_sq
     # cls: (1, 80, 8400)

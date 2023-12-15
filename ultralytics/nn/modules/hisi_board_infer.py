@@ -59,16 +59,17 @@ class hisi_board_infer(object):
             print("output: board process has not started")
 
     def parse_output_bin(self, bin_files:list, output_file_prefix):
-        preds = []
+        preds = [None] * self.output_num
         for file_path in bin_files:
             file_stem = file_path.stem
             output_node = file_stem[len(output_file_prefix):]
+            node_index = self.output_nodes.index(output_node)
             with open(str(file_path), 'rb') as f:
                 data = f.read()
                 pred = np.ndarray(self.model_info[output_node]['dims'], dtype=self.model_info[output_node]['dtype'], buffer=data)
                 # rescale
-                pred = (pred - self.model_info[output_node]['offset']) / self.model_info[output_node]['scale']
-                preds.append(pred)
+                preds[node_index] = (pred - self.model_info[output_node]['offset']) / self.model_info[output_node]['scale']
+
         y = None
         if self.output_num == 1:
             y = preds[0]
@@ -120,17 +121,22 @@ class hisi_board_infer(object):
                 info_needed[out_name]['dtype'] = dtype_map[scale_off[0]
                                                            ['data_type']]
         self.output_num = output_num
+        self.output_nodes = om_model_info['v_output_names']
         self.model_info = info_needed
         self.reg_max = om_model_info['reg_max']
         self.no = info_needed['cl_num'] + self.reg_max * 4
         self.anchors, self.strides_sq = None, None
         if len(om_model_info['strides']) > 0:
+            # hs = sorted([om_model_info['h'] // s_i for s_i in om_model_info['strides']], reverse=True)
+            # ws = sorted([om_model_info['w'] // s_i for s_i in om_model_info['strides']], reverse=True)
+            # strides = sorted(om_model_info['strides'])
             hs = [om_model_info['h'] // s_i for s_i in om_model_info['strides']]
             ws = [om_model_info['w'] // s_i for s_i in om_model_info['strides']]
-            self.anchors, self.strides_sq = make_anchors_numpy(hs, ws, om_model_info['strides'])
+            strides = om_model_info['strides']
+            self.anchors, self.strides_sq = make_anchors_numpy(hs, ws, strides)
 
 
-    def start_board(self, ssh_cfg: str = default_ssh_cfg, om_exe: str = default_om_exe, std_out=True):
+    def start_board(self, ssh_cfg: str = default_ssh_cfg, om_exe: str = default_om_exe, std_out=False):
         self.board = BoardInfer(["-s", ssh_cfg, "--om", self.om, "--exe_path", om_exe])
         self.exchange_data_dir = Path(self.board.exchange_data_dir)
         # cleaned signal
