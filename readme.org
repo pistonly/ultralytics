@@ -343,3 +343,6 @@ infer_config: None
 replace: False
 
 #+end_src
+
+* hisi om model
+

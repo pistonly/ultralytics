@@ -7,11 +7,12 @@ from multiprocessing import Process
 import time
 import json
 import yaml
-
+import os
 
 default_ssh_cfg = "/mnt/root2204/home/liuyang/Documents/YOLO/ultralytics-compare/ssh.cfg"
 default_om_exe = "/home/liuyang/haisi/ai-sd3403/mpp_inference/out/svp_pingpong_rpc"
 dtype_map = {"S8": np.int8, "F16": np.float16}
+
 
 class hisi_board_infer(object):
 
@@ -32,6 +33,7 @@ class hisi_board_infer(object):
             # ready signal
             f = open(str(self.exchange_data_dir / f"img_{self.input_id}.bin.ready"), "w")
             f.close()
+            # print(f"write img: {self.input_id}")
             self.input_id += 1
         else:
             print("input: board process has not started")
@@ -49,6 +51,7 @@ class hisi_board_infer(object):
             output_names = sorted(self.exchange_data_dir.glob(f"{output_file_prefix}*.bin"))
             if len(output_names) > 0:
                 outputs = self.parse_output_bin(output_names, output_file_prefix)
+                self.delete_old_files()
                 self.output_id += 1
                 return outputs
             elif self.get_stop_signal:
@@ -58,7 +61,15 @@ class hisi_board_infer(object):
         else:
             print("output: board process has not started")
 
-    def parse_output_bin(self, bin_files:list, output_file_prefix):
+    def delete_old_files(self):
+        old_files0 = sorted(self.exchange_data_dir.glob(f"output_{self.output_id}*"))
+        old_files1 = sorted(self.exchange_data_dir.glob(f"img_{self.output_id}*"))
+        old_files = old_files0 + old_files1
+        for f in old_files:
+            if f.is_file():
+                os.remove(str(f))
+
+    def parse_output_bin(self, bin_files: list, output_file_prefix):
         preds = [None] * self.output_num
         for file_path in bin_files:
             file_stem = file_path.stem
@@ -66,9 +77,12 @@ class hisi_board_infer(object):
             node_index = self.output_nodes.index(output_node)
             with open(str(file_path), 'rb') as f:
                 data = f.read()
-                pred = np.ndarray(self.model_info[output_node]['dims'], dtype=self.model_info[output_node]['dtype'], buffer=data)
+                pred = np.ndarray(self.model_info[output_node]['dims'],
+                                  dtype=self.model_info[output_node]['dtype'],
+                                  buffer=data)
                 # rescale
-                preds[node_index] = (pred - self.model_info[output_node]['offset']) / self.model_info[output_node]['scale']
+                preds[node_index] = (pred -
+                                     self.model_info[output_node]['offset']) / self.model_info[output_node]['scale']
 
         y = None
         if self.output_num == 1:
@@ -76,7 +90,13 @@ class hisi_board_infer(object):
         elif self.output_num == 2:
             y = forward_on_2output_numpy(preds)
         else:
-            y = forward_on_3output_numpy(preds, self.model_info['batch'], self.no, self.reg_max, self.anchors, self.strides_sq, xywh=True)
+            y = forward_on_3output_numpy(preds,
+                                         self.model_info['batch'],
+                                         self.no,
+                                         self.reg_max,
+                                         self.anchors,
+                                         self.strides_sq,
+                                         xywh=True)
         return y
 
     def get_outputs(self, batch_num):
@@ -105,8 +125,7 @@ class hisi_board_infer(object):
         info_needed['batch'] = om_model_info['batch']
         info_needed['cl_num'] = om_model_info['cl_num']  # only used with output_num == 3
         output_num = 0
-        for out_name, dims in zip(om_model_info['v_output_names'],
-                                  om_model_info['v_output_dims']):
+        for out_name, dims in zip(om_model_info['v_output_names'], om_model_info['v_output_dims']):
             output_num += 1
             info_needed[out_name] = {}
             info_needed[out_name]['dims'] = dims
@@ -118,8 +137,7 @@ class hisi_board_infer(object):
             else:
                 info_needed[out_name]['scale'] = scale_off[0]['scale']
                 info_needed[out_name]['offset'] = scale_off[0]['offset']
-                info_needed[out_name]['dtype'] = dtype_map[scale_off[0]
-                                                           ['data_type']]
+                info_needed[out_name]['dtype'] = dtype_map[scale_off[0]['data_type']]
         self.output_num = output_num
         self.output_nodes = om_model_info['v_output_names']
         self.model_info = info_needed
@@ -135,8 +153,7 @@ class hisi_board_infer(object):
             strides = om_model_info['strides']
             self.anchors, self.strides_sq = make_anchors_numpy(hs, ws, strides)
 
-
-    def start_board(self, ssh_cfg: str = default_ssh_cfg, om_exe: str = default_om_exe, std_out=False):
+    def start_board(self, ssh_cfg: str = default_ssh_cfg, om_exe: str = default_om_exe, std_out=True):
         self.board = BoardInfer(["-s", ssh_cfg, "--om", self.om, "--exe_path", om_exe])
         self.exchange_data_dir = Path(self.board.exchange_data_dir)
         # cleaned signal
