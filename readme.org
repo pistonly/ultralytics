@@ -200,7 +200,11 @@ return: xyxy in native space
 #+end_src
 
 * train
-
+** multi_dataset
+see ~./ultralytics/cfg/datasets/multi_sod4birdsTrain-coco.yaml~
+- support multiple datasets
+- can set ratio of each datasets
+- support mapping to new labels 
 * issue
 ** ppyolo predict transforms is None [001]
 setup_source override transforms.
