@@ -296,6 +296,8 @@ def check_det_dataset(dataset, autodownload=True):
                 if not x.exists() and data[k].startswith('../'):
                     x = (path / data[k][3:]).resolve()
                 data[k] = str(x)
+            elif  isinstance(data[k], dict):
+                pass
             else:
                 data[k] = [str((path / x).resolve()) for x in data[k]]
 
