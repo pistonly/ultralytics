@@ -303,7 +303,7 @@ def check_det_dataset(dataset, autodownload=True):
 
     # Parse YAML
     val, s = (data.get(x) for x in ('val', 'download'))
-    if val:
+    if val and (not isinstance(val, dict)):
         val = [Path(x).resolve() for x in (val if isinstance(val, list) else [val])]  # val path
         if not all(x.exists() for x in val):
             name = clean_url(dataset)  # dataset name with URL auth stripped

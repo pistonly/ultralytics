@@ -1,6 +1,7 @@
 from .dataset import YOLODataset
 import random
 import numpy as np
+from copy import deepcopy
 
 
 class MultiYOLODataset(YOLODataset):
@@ -20,12 +21,14 @@ class MultiYOLODataset(YOLODataset):
         self.datasets_ratios = []
         self.datasets_labelMaps = []
         self.datasets_lens = []
+        self.datasets_hyp_overide = []
         for i, path_dict in enumerate(img_path_list):
             dataset_path = path_dict['path']
-            # TODO: update hyp
             dataset_hyp = path_dict.get('hyp', {})
+            self.datasets_hyp_overide.append(dataset_hyp)
             kwargs_i = kwargs.copy()
             kwargs_i['img_path'] = dataset_path
+            self.update_hyp(kwargs_i['hyp'], dataset_hyp)
 
             self.datasets_multi.append(YOLODataset(*args, data=data, use_segments=use_segments,
                                               use_keypoints=use_keypoints, **kwargs_i))
@@ -33,6 +36,13 @@ class MultiYOLODataset(YOLODataset):
             self.datasets_labelMaps.append(path_dict.get('label_map'))
             self.datasets_lens.append(len(self.datasets_multi[i]))
         self.ratios_cum = np.cumsum(self.datasets_ratios)
+
+    def update_hyp(self, hyp, hyp_overide):
+        for k, item in hyp_overide.items():
+            if hasattr(hyp, k):
+                hyp.__setattr__(k, item)
+            else:
+                raise RuntimeError(f'{k} not in hyp.attr, which is: {vars(hyp).keys()}')
 
     def __getitem__(self, index):
         rand_num = random.random()
@@ -47,5 +57,8 @@ class MultiYOLODataset(YOLODataset):
     def __len__(self):
         return self.datasets_lens[0]
 
-
-
+    def close_mosaic(self, hyp):
+        for i in range(len(self.datasets_multi)):
+            hyp_i = deepcopy(hyp)
+            self.update_hyp(hyp_i, self.datasets_hyp_overide[i])
+            self.datasets_multi[i].close_mosaic(hyp_i)

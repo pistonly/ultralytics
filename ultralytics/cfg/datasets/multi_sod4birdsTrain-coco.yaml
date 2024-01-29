@@ -7,7 +7,13 @@ train:
       ratio: 0.9
     - path: /home/liuyang/datasets/coco/train2017.txt
       ratio: 0.1
-val: /home/liuyang/datasets/small_object_detection/sod4bird/images_6x6/val_images.txt
+val:
+  multi_ds:
+    - path: /home/liuyang/datasets/small_object_detection/sod4bird/images_6x6/val_images.txt
+      label_map:
+        0: 14
+      ratio: 1
+  
 test: /home/liuyang/datasets/small_object_detection/sod4bird/images_6x6/val_images.txt
 
 # Classes
