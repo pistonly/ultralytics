@@ -324,9 +324,14 @@ class LoadImages:
         if self.video_flag[self.count]:
             # Read video
             self.mode = 'video'
-            for _ in range(self.vid_stride):
-                self.cap.grab()
-            success, im0 = self.cap.retrieve()
+            while True:  # skip error frames
+                for _ in range(self.vid_stride):
+                    self.cap.grab()
+                success, im0 = self.cap.retrieve()
+                self.frame += 1
+                if success or self.frame == self.frames:
+                    break
+
             while not success:
                 self.count += 1
                 self.cap.release()
@@ -336,7 +341,6 @@ class LoadImages:
                 self._new_video(path)
                 success, im0 = self.cap.read()
 
-            self.frame += 1
             # im0 = self._cv2_rotate(im0)  # for use if cv2 autorotation is False
             s = f'video {self.count + 1}/{self.nf} ({self.frame}/{self.frames}) {path}: '
 
